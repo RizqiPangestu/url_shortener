@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/dig"
 )
 
@@ -33,6 +35,10 @@ type application struct {
 func startServer(a application) {
 	ec := echo.New()
 	ec.Validator = a.Validator
+	ec.Use(middleware.BodyDumpWithConfig(middleware.BodyDumpConfig{
+		Skipper: middleware.DefaultSkipper,
+		Handler: bodyDumpHandler,
+	}))
 	ec.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "OK"})
 	})
@@ -76,4 +82,31 @@ func (v *validate) Validate(object interface{}) error {
 	}
 
 	return nil
+}
+
+func bodyDumpHandler(c echo.Context, reqBody, resBody []byte) {
+	req := c.Request()
+	ctx := req.Context()
+	slog.InfoContext(ctx, "HTTP request received",
+		slog.Any("request", struct {
+			Url    string      `json:"url"`
+			Method string      `json:"method"`
+			Header http.Header `json:"header"`
+			Body   string      `json:"body,omitempty"`
+		}{
+			Url:    req.URL.String(),
+			Method: req.Method,
+			Header: req.Header,
+			Body:   string(reqBody),
+		}),
+		slog.Any("response", struct {
+			Header http.Header `json:"header"`
+			Body   string      `json:"body,omitempty"`
+			Status int         `json:"status"`
+		}{
+			Header: c.Response().Header(),
+			Body:   string(resBody),
+			Status: c.Response().Status,
+		}),
+	)
 }
