@@ -1,6 +1,12 @@
 package core
 
-import "github.com/google/uuid"
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type URLService interface {
 	Shorten(url string) (string, error)
@@ -8,34 +14,57 @@ type URLService interface {
 }
 
 type URLPort interface {
-	SavePath(shortPath string, originURL string) error
-	GetOriginURL(shortPath string) (string, error)
+	SavePath(shortPath string, originURL string, ttl time.Duration) error
+	GetByShortPath(shortPath string) (URL, error)
+	UpdateLastAccessedAt(shortPath string) error
+	DeleteByShortPath(shortPath string) error
 }
 
 type urlService struct {
-	port URLPort
+	port       URLPort
+	baseDomain string
 }
 
-func NewURLService(port URLPort) URLService {
+func NewURLService(port URLPort, baseDomain string) URLService {
 	return &urlService{
-		port: port,
+		port:       port,
+		baseDomain: baseDomain,
 	}
 }
 
 func (s *urlService) Shorten(url string) (string, error) {
-	shortPath := uuid.New().String()[:8]
-	if err := s.port.SavePath(shortPath, url); err != nil {
+	return s.shortenWithRetry(url, 0)
+}
+
+func (s *urlService) shortenWithRetry(url string, attempt int) (string, error) {
+	shortPath := uuid.NewString()[:8]
+	if err := s.port.SavePath(shortPath, url, DefaultTTL); err != nil {
+		if errors.Is(err, ErrURLAlreadyExists) && attempt < 3 { // retry 3 times
+			return s.shortenWithRetry(url, attempt+1)
+		}
 		return "", err
 	}
 
-	return "https://" + shortPath, nil
+	return s.baseDomain + "/u/" + shortPath, nil
 }
 
 func (s *urlService) Expand(shortPath string) (string, error) {
-	originURL, err := s.port.GetOriginURL(shortPath)
+	url, err := s.port.GetByShortPath(shortPath)
 	if err != nil {
 		return "", err
 	}
 
-	return originURL, nil
+	if time.Since(url.LastAccessedAt) > url.TTL {
+		fmt.Println(time.Since(url.LastAccessedAt), url.TTL)
+		if err := s.port.DeleteByShortPath(shortPath); err != nil {
+			return "", err
+		}
+		return "", ErrURLExpired
+	}
+
+	if err := s.port.UpdateLastAccessedAt(shortPath); err != nil {
+		return "", err
+	}
+
+	return url.OriginalURL, nil
 }

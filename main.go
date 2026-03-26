@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/RizqiPangestu/url_shortener/internal/adapter"
@@ -59,9 +61,17 @@ func registerDependencies(c *dig.Container) {
 	}
 
 	c.Provide(app.NewAPIController)
-	c.Provide(core.NewURLService)
-	c.Provide(adapter.NewURLMongoAdapter)
+	c.Provide(newURLService)
+	c.Provide(adapter.NewURLPostgresAdapter)
 	c.Provide(NewValidator)
+}
+
+func newURLService(port core.URLPort) (core.URLService, error) {
+	baseDomain := os.Getenv("BASE_DOMAIN")
+	if !strings.HasPrefix(baseDomain, "http") {
+		return nil, errors.New("BASE_DOMAIN is not set")
+	}
+	return core.NewURLService(port, baseDomain), nil
 }
 
 type validate struct {

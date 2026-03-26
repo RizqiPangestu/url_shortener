@@ -9,11 +9,11 @@ import (
 	"github.com/go-pg/pg/v10/orm"
 )
 
-type urlMongoAdapter struct {
+type urlPostgresAdapter struct {
 	db *pg.DB
 }
 
-func NewURLMongoAdapter() core.URLPort {
+func NewURLPostgresAdapter() core.URLPort {
 	db := pg.Connect(&pg.Options{
 		Addr:     "localhost:5432",
 		Database: "localpostgre",
@@ -26,32 +26,66 @@ func NewURLMongoAdapter() core.URLPort {
 		panic(err)
 	}
 
-	return &urlMongoAdapter{
+	return &urlPostgresAdapter{
 		db: db,
 	}
 }
 
-func (a *urlMongoAdapter) SavePath(shortPath string, originURL string) error {
+func (a *urlPostgresAdapter) SavePath(shortPath string, originURL string, ttl time.Duration) error {
 	now := time.Now()
 	_, err := a.db.Model(&postgres.URL{
-		OriginalURL: originURL,
-		ShortPath:   shortPath,
-		TTL:         0,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		OriginalURL:    originURL,
+		ShortPath:      shortPath,
+		TTL:            ttl,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+		LastAccessedAt: now,
 	}).Insert()
 	if err != nil {
+		if pgErr, ok := err.(pg.Error); ok && pgErr.IntegrityViolation() {
+			// 23505 is the code for unique violation
+			// ref: postgresql.org/docs/10/static/errcodes-appendix.html
+			if pgErr.Field('C') == "23505" {
+				return core.ErrURLAlreadyExists
+			}
+
+		}
 		return err
 	}
 
 	return nil
 }
 
-func (a *urlMongoAdapter) GetOriginURL(shortPath string) (string, error) {
+func (a *urlPostgresAdapter) GetByShortPath(shortPath string) (core.URL, error) {
 	var url postgres.URL
+	// TODO: handle SQL injection
 	err := a.db.Model(&url).Where("short_path = ?", shortPath).Select()
 	if err != nil {
-		return "", err
+		return core.URL{}, err
 	}
-	return url.OriginalURL, nil
+
+	return url.Entity(), nil
+}
+
+func (a *urlPostgresAdapter) UpdateLastAccessedAt(shortPath string) error {
+	now := time.Now()
+	_, err := a.db.Model(&postgres.URL{
+		ShortPath:      shortPath,
+		UpdatedAt:      now,
+		LastAccessedAt: now,
+	}).WherePK().UpdateNotZero()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *urlPostgresAdapter) DeleteByShortPath(shortPath string) error {
+	_, err := a.db.Model(&postgres.URL{
+		ShortPath: shortPath,
+	}).WherePK().Delete()
+	if err != nil {
+		return err
+	}
+	return nil
 }

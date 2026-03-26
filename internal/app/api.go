@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/RizqiPangestu/url_shortener/internal/core"
@@ -10,7 +11,7 @@ import (
 type APIController interface {
 	RegisterRoutes(ec *echo.Echo)
 	Shorten(ec echo.Context) error
-	Expand(ec echo.Context) error
+	Redirect(ec echo.Context) error
 }
 
 type apiController struct {
@@ -25,7 +26,7 @@ func NewAPIController(urlService core.URLService) APIController {
 
 func (c *apiController) RegisterRoutes(ec *echo.Echo) {
 	ec.POST("/shorten", c.Shorten)
-	ec.GET("/expand", c.Expand)
+	ec.GET("u/:short_path", c.Redirect)
 }
 
 func (c *apiController) Shorten(ec echo.Context) error {
@@ -36,6 +37,10 @@ func (c *apiController) Shorten(ec echo.Context) error {
 
 	result, err := c.URLService.Shorten(req.URL)
 	if err != nil {
+		if errors.Is(err, core.ErrURLAlreadyExists) { // obfuscate already exists error
+			return ec.JSON(http.StatusInternalServerError, map[string]string{"error": core.ErrSystemError.Error()})
+		}
+
 		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
@@ -44,8 +49,8 @@ func (c *apiController) Shorten(ec echo.Context) error {
 	})
 }
 
-func (c *apiController) Expand(ec echo.Context) error {
-	var req ExpandRequest
+func (c *apiController) Redirect(ec echo.Context) error {
+	var req RedirectRequest
 	if err := ec.Bind(&req); err != nil {
 		return ec.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
@@ -55,12 +60,10 @@ func (c *apiController) Expand(ec echo.Context) error {
 		return ec.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	result, err := c.URLService.Expand(req.ShortURL)
+	result, err := c.URLService.Expand(req.ShortPath)
 	if err != nil {
 		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return ec.JSON(http.StatusOK, ExpandResponse{
-		URL: result,
-	})
+	return ec.Redirect(http.StatusPermanentRedirect, result)
 }
