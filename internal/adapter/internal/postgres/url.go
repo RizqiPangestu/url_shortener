@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/RizqiPangestu/url_shortener/internal/core"
@@ -17,7 +16,6 @@ type URL struct {
 }
 
 func (u *URL) Entity() core.URL {
-	fmt.Printf("%+v\n", u)
 	return core.URL{
 		ShortPath:      u.ShortPath,
 		OriginalURL:    u.OriginalURL,

@@ -60,18 +60,21 @@ func registerDependencies(c *dig.Container) {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
-	c.Provide(app.NewAPIController)
-	c.Provide(newURLService)
+	c.Provide(newAPIController)
+	c.Provide(core.NewURLService)
+	c.Provide(core.NewTrackerService)
 	c.Provide(adapter.NewURLPostgresAdapter)
+	c.Provide(adapter.NewTrackerPostgresAdapter)
 	c.Provide(NewValidator)
+	c.Provide(adapter.NewPostgresDB)
 }
 
-func newURLService(port core.URLPort) (core.URLService, error) {
+func newAPIController(urlService core.URLService, trackerService core.TrackerService) (app.APIController, error) {
 	baseDomain := os.Getenv("BASE_DOMAIN")
 	if !strings.HasPrefix(baseDomain, "http") {
 		return nil, errors.New("BASE_DOMAIN is not set")
 	}
-	return core.NewURLService(port, baseDomain), nil
+	return app.NewAPIController(urlService, baseDomain, trackerService), nil
 }
 
 type validate struct {

@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,14 +20,12 @@ type URLPort interface {
 }
 
 type urlService struct {
-	port       URLPort
-	baseDomain string
+	port URLPort
 }
 
-func NewURLService(port URLPort, baseDomain string) URLService {
+func NewURLService(port URLPort) URLService {
 	return &urlService{
-		port:       port,
-		baseDomain: baseDomain,
+		port: port,
 	}
 }
 
@@ -45,7 +42,7 @@ func (s *urlService) shortenWithRetry(url string, attempt int) (string, error) {
 		return "", err
 	}
 
-	return s.baseDomain + "/u/" + shortPath, nil
+	return shortPath, nil
 }
 
 func (s *urlService) Expand(shortPath string) (string, error) {
@@ -55,7 +52,6 @@ func (s *urlService) Expand(shortPath string) (string, error) {
 	}
 
 	if time.Since(url.LastAccessedAt) > url.TTL {
-		fmt.Println(time.Since(url.LastAccessedAt), url.TTL)
 		if err := s.port.DeleteByShortPath(shortPath); err != nil {
 			return "", err
 		}

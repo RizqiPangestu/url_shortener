@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/RizqiPangestu/url_shortener/internal/core"
@@ -15,18 +16,32 @@ type APIController interface {
 }
 
 type apiController struct {
-	URLService core.URLService
+	urlService     core.URLService
+	baseDomain     string
+	trackerService core.TrackerService
 }
 
-func NewAPIController(urlService core.URLService) APIController {
+func NewAPIController(urlService core.URLService, baseDomain string, trackerService core.TrackerService) APIController {
 	return &apiController{
-		URLService: urlService,
+		urlService:     urlService,
+		baseDomain:     baseDomain,
+		trackerService: trackerService,
 	}
 }
 
 func (c *apiController) RegisterRoutes(ec *echo.Echo) {
 	ec.POST("/shorten", c.Shorten)
-	ec.GET("u/:short_path", c.Redirect)
+	ec.GET("u/:short_path", c.Redirect, func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ec echo.Context) error {
+			err := next(ec)
+			shortPath := ec.Param("short_path")
+			if err := c.trackerService.Track(shortPath); err != nil {
+				slog.WarnContext(ec.Request().Context(), "error tracking", "error", err)
+			}
+
+			return err
+		}
+	})
 }
 
 func (c *apiController) Shorten(ec echo.Context) error {
@@ -35,7 +50,7 @@ func (c *apiController) Shorten(ec echo.Context) error {
 		return ec.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	result, err := c.URLService.Shorten(req.URL)
+	result, err := c.urlService.Shorten(req.URL)
 	if err != nil {
 		if errors.Is(err, core.ErrURLAlreadyExists) { // obfuscate already exists error
 			return ec.JSON(http.StatusInternalServerError, map[string]string{"error": core.ErrSystemError.Error()})
@@ -45,7 +60,7 @@ func (c *apiController) Shorten(ec echo.Context) error {
 	}
 
 	return ec.JSON(http.StatusOK, ShortenResponse{
-		ShortURL: result,
+		ShortURL: c.baseDomain + "/u/" + result,
 	})
 }
 
@@ -60,7 +75,7 @@ func (c *apiController) Redirect(ec echo.Context) error {
 		return ec.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	result, err := c.URLService.Expand(req.ShortPath)
+	result, err := c.urlService.Expand(req.ShortPath)
 	if err != nil {
 		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}

@@ -13,13 +13,7 @@ type urlPostgresAdapter struct {
 	db *pg.DB
 }
 
-func NewURLPostgresAdapter() core.URLPort {
-	db := pg.Connect(&pg.Options{
-		Addr:     "localhost:5432",
-		Database: "localpostgre",
-		User:     "rizqipangestu",
-	})
-
+func NewURLPostgresAdapter(db *pg.DB) core.URLPort {
 	if err := db.Model(&postgres.URL{}).CreateTable(&orm.CreateTableOptions{
 		IfNotExists: true,
 	}); err != nil {
