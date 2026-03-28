@@ -35,6 +35,7 @@ type application struct {
 }
 
 func startServer(a application) {
+	configureLogger()
 	ec := echo.New()
 	ec.Validator = a.Validator
 	ec.Use(middleware.BodyDumpWithConfig(middleware.BodyDumpConfig{
@@ -52,7 +53,21 @@ func startServer(a application) {
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 3 * time.Second,
 	})
+}
 
+func configureLogger() {
+	logger := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+			if a.Key == slog.SourceKey {
+				source := a.Value.Any().(*slog.Source)
+				a.Value = slog.StringValue(fmt.Sprintf("%s: %s:%d", source.Function, source.File, source.Line))
+			}
+			return a
+		},
+	})
+	slog.SetDefault(slog.New(logger))
 }
 
 func registerDependencies(c *dig.Container) {

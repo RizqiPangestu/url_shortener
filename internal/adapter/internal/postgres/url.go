@@ -7,7 +7,7 @@ import (
 )
 
 type URL struct {
-	ShortPath      string        `pg:"short_path,pk,unique"`
+	ShortPath      string        `pg:"short_path,pk"`
 	OriginalURL    string        `pg:"original_url"`
 	TTL            time.Duration `pg:"ttl"`
 	CreatedAt      time.Time     `pg:"created_at"`

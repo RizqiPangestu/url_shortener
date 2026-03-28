@@ -12,5 +12,6 @@ const (
 var (
 	ErrURLExpired       = errors.New("URL has expired")
 	ErrURLAlreadyExists = errors.New("URL already exists")
+	ErrURLNotFound      = errors.New("URL not found")
 	ErrSystemError      = errors.New("SYSTEM_ERROR")
 )

@@ -33,14 +33,13 @@ func (a *trackerPostgresAdapter) Track(shortPath string) error {
 	// do upsert
 	if _, err := a.db.Model(&postgres.Tracker{
 		ShortPath:     shortPath,
+		Date:          dateOnly,
 		ClickCount:    1,
 		LastClickedAt: now,
-		Timestamp:     dateOnly,
 	}).
-		OnConflict("(short_path) DO UPDATE").
+		OnConflict(`("short_path", "date") DO UPDATE`).
 		Set(`click_count = tracker.click_count + 1, 
-			last_clicked_at = EXCLUDED.last_clicked_at, 
-			date = EXCLUDED.date`).
+			last_clicked_at = EXCLUDED.last_clicked_at`).
 		Insert(); err != nil {
 		return err
 	}

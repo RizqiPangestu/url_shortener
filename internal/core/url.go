@@ -8,12 +8,13 @@ import (
 )
 
 type URLService interface {
-	Shorten(url string) (string, error)
+	Shorten(originalURL string) (string, error)
 	Expand(shortURL string) (string, error)
 }
 
 type URLPort interface {
 	SavePath(shortPath string, originURL string, ttl time.Duration) error
+	GetByOriginalURL(originalURL string) (URL, error)
 	GetByShortPath(shortPath string) (URL, error)
 	UpdateLastAccessedAt(shortPath string) error
 	DeleteByShortPath(shortPath string) error
@@ -29,15 +30,24 @@ func NewURLService(port URLPort) URLService {
 	}
 }
 
-func (s *urlService) Shorten(url string) (string, error) {
-	return s.shortenWithRetry(url, 0)
+func (s *urlService) Shorten(originalURL string) (string, error) {
+	// reuse existing short path if exists
+	url, err := s.port.GetByOriginalURL(originalURL)
+	if err != nil {
+		if errors.Is(err, ErrURLNotFound) {
+			return s.shortenWithRetry(originalURL, 0)
+		}
+		return "", err
+	}
+
+	return url.ShortPath, nil
 }
 
-func (s *urlService) shortenWithRetry(url string, attempt int) (string, error) {
+func (s *urlService) shortenWithRetry(originalURL string, attempt int) (string, error) {
 	shortPath := uuid.NewString()[:8]
-	if err := s.port.SavePath(shortPath, url, DefaultTTL); err != nil {
+	if err := s.port.SavePath(shortPath, originalURL, DefaultTTL); err != nil {
 		if errors.Is(err, ErrURLAlreadyExists) && attempt < 3 { // retry 3 times
-			return s.shortenWithRetry(url, attempt+1)
+			return s.shortenWithRetry(originalURL, attempt+1)
 		}
 		return "", err
 	}

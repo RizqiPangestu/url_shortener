@@ -80,5 +80,8 @@ func (c *apiController) Redirect(ec echo.Context) error {
 		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
 
-	return ec.Redirect(http.StatusPermanentRedirect, result)
+	// use found status code to prevent browser from caching the redirect
+	// so we can track the redirect for analytics
+	// ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/302
+	return ec.Redirect(http.StatusFound, result)
 }

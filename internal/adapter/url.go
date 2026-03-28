@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"errors"
 	"time"
 
 	"github.com/RizqiPangestu/url_shortener/internal/adapter/internal/postgres"
@@ -48,6 +49,19 @@ func (a *urlPostgresAdapter) SavePath(shortPath string, originURL string, ttl ti
 	}
 
 	return nil
+}
+
+func (a *urlPostgresAdapter) GetByOriginalURL(originalURL string) (core.URL, error) {
+	var url postgres.URL
+	// TODO: create an index on original_url
+	err := a.db.Model(&url).Where("original_url = ?", originalURL).Select()
+	if err != nil {
+		if errors.Is(err, pg.ErrNoRows) {
+			return core.URL{}, core.ErrURLNotFound
+		}
+		return core.URL{}, err
+	}
+	return url.Entity(), nil
 }
 
 func (a *urlPostgresAdapter) GetByShortPath(shortPath string) (core.URL, error) {
