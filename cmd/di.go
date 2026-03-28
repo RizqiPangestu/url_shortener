@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -32,7 +33,7 @@ func newAPIController(urlService core.URLService, trackerService core.TrackerSer
 
 func newPostgresDB() *pg.DB {
 	return adapter.NewPostgresDB(
-		os.Getenv(ConfigPostgresHost),
+		fmt.Sprintf("%s:%s", os.Getenv(ConfigPostgresHost), os.Getenv(ConfigPostgresPort)),
 		os.Getenv(ConfigPostgresDatabase),
 		os.Getenv(ConfigPostgresUser),
 		os.Getenv(ConfigPostgresPassword),

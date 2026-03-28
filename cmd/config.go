@@ -12,6 +12,7 @@ const (
 	ConfigAddress    = "ADDRESS"
 
 	ConfigPostgresHost     = "POSTGRES_HOST"
+	ConfigPostgresPort     = "POSTGRES_PORT"
 	ConfigPostgresDatabase = "POSTGRES_DATABASE"
 	ConfigPostgresUser     = "POSTGRES_USER"
 	ConfigPostgresPassword = "POSTGRES_PASSWORD"
@@ -22,6 +23,7 @@ var configs = []string{
 	ConfigAddress,
 
 	ConfigPostgresHost,
+	ConfigPostgresPort,
 	ConfigPostgresDatabase,
 	ConfigPostgresUser,
 	ConfigPostgresPassword,
