@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -30,7 +29,7 @@ var configs = []string{
 
 func checkConfigs() {
 	if err := godotenv.Load(".env"); err != nil {
-		slog.Warn("Error loading .env file: %v", err)
+		log.Printf("Error loading .env file: %v\n", err)
 	}
 
 	for _, config := range configs {
