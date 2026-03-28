@@ -1,20 +1,15 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/RizqiPangestu/url_shortener/internal/adapter"
 	"github.com/RizqiPangestu/url_shortener/internal/app"
-	"github.com/RizqiPangestu/url_shortener/internal/core"
 	"github.com/go-playground/validator/v10"
-	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/dig"
@@ -22,6 +17,8 @@ import (
 
 func main() {
 	c := dig.New()
+	configureLogger()
+	checkConfigs()
 	registerDependencies(c)
 	if err := c.Invoke(startServer); err != nil {
 		log.Fatalf("Error starting server: %v", err)
@@ -35,7 +32,6 @@ type application struct {
 }
 
 func startServer(a application) {
-	configureLogger()
 	ec := echo.New()
 	ec.Validator = a.Validator
 	ec.Use(middleware.BodyDumpWithConfig(middleware.BodyDumpConfig{
@@ -49,7 +45,7 @@ func startServer(a application) {
 	a.APIController.RegisterRoutes(ec)
 
 	ec.StartServer(&http.Server{
-		Addr:         os.Getenv("ADDRESS"),
+		Addr:         os.Getenv(ConfigAddress),
 		ReadTimeout:  3 * time.Second,
 		WriteTimeout: 3 * time.Second,
 	})
@@ -68,28 +64,6 @@ func configureLogger() {
 		},
 	})
 	slog.SetDefault(slog.New(logger))
-}
-
-func registerDependencies(c *dig.Container) {
-	if err := godotenv.Load(".env"); err != nil {
-		log.Fatalf("Error loading .env file: %v", err)
-	}
-
-	c.Provide(newAPIController)
-	c.Provide(core.NewURLService)
-	c.Provide(core.NewTrackerService)
-	c.Provide(adapter.NewURLPostgresAdapter)
-	c.Provide(adapter.NewTrackerPostgresAdapter)
-	c.Provide(NewValidator)
-	c.Provide(adapter.NewPostgresDB)
-}
-
-func newAPIController(urlService core.URLService, trackerService core.TrackerService) (app.APIController, error) {
-	baseDomain := os.Getenv("BASE_DOMAIN")
-	if !strings.HasPrefix(baseDomain, "http") {
-		return nil, errors.New("BASE_DOMAIN is not set")
-	}
-	return app.NewAPIController(urlService, baseDomain, trackerService), nil
 }
 
 type validate struct {
