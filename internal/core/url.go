@@ -40,6 +40,11 @@ func (s *urlService) Shorten(originalURL string) (string, error) {
 		return "", err
 	}
 
+	// refresh existing LastAccessedAt
+	if err := s.port.UpdateLastAccessedAt(url.ShortPath); err != nil {
+		return "", err
+	}
+
 	return url.ShortPath, nil
 }
 
